@@ -13,48 +13,53 @@ init() ->
   Collection = <<"TopicHistory">>,
   
   UserId = 10087,
-  Nickname = unicode:characters_to_binary("回家吃饭"),
-  Body = unicode:characters_to_binary("曹大爷操蛋......"),
+  Nickname = unicode:characters_to_binary("艹他么乱码"),
+  Body = unicode:characters_to_binary("艹他么乱码......"),
   Map1 = #{
-    <<"type">> => 1,			%%	
-    <<"userId">> => 10086,		%%
-    <<"id">> => <<"USER/10089">>,	%%
-    <<"name">> => Nickname,		%%
-    <<"desc">> => Body,			%%
-    <<"time">> => 11860056656,	%%
-    <<"count">> => 198			%%
+    <<"type">> => 1,				
+    <<"userId">> => 10086,		
+    <<"id">> => <<"USER/10020">>,	
+    <<"name">> => Nickname,		
+    <<"desc">> => Body,			
+    <<"time">> => 11860056656,	
+    <<"count">> => 198			
   },
+  Id = <<"USER/10086">>,
   
-  {ok, Connection} = mongo:connect([{database, Database}, {host, Host}, {port, Port}]),
-  Record = mongo:find_one(Connection, Collection, {<<"_id">>, UserId}),
-  case maps:size(Record) of
+  {ok, DBConnection} = mongo:connect([{database, Database}, {host, Host}, {port, Port}]),
+  case mongo:count(DBConnection, Collection, {<<"_id">>, UserId}) of
     0 ->
-      Map2 = #{<<"_id">> => UserId, <<"topics">> => [Map1]},
-      mongo:insert(Connection, Collection, Map2);
+      mongo:insert(DBConnection, Collection, #{<<"_id">> => UserId, <<"topics">> => [Map1]});
     _ ->
-      Q = #{<<"_id">> => UserId},
-	  Ops = #{<<"$addToSet">> => #{<<"topics">> =>  #{<<"$each">> => [Map1]}}},
-	  mongo:update(Connection, Collection, Q, Ops)
-  end.
+	  case mongo:count(DBConnection, Collection, {<<"_id">>, UserId, <<"topics.id">>, Id}) of
+		  0 -> 
+			Q = #{<<"_id">> => UserId},
+	  		Ops = #{<<"$addToSet">> => #{<<"topics">> =>  #{<<"$each">> => [Map1]}}},
+	  		mongo:update(DBConnection, Collection, Q, Ops);
+		  _ -> "exists,skip"
+      end
+  end,
+  mongo:disconnect(DBConnection).
 
 init1()->
-  Host = "114.119.6.150",
-  Port = 27017,
-  Database = <<"db0">>,
-  Collection = <<"TopicHistory">>,
-  UserId = 10087,
-  Id = "USER/10089",
-  
-  {ok, Connection} = mongo:connect([{database, Database}, {host, Host}, {port, Port}]),
-  Record = mongo:find_one(Connection, Collection, {<<"_id">>, UserId, <<"topics.id">>, Id}),
-  Record.
+	A= <<"fuck">>,
+	binary_to_list(A).
+%%   Host = "114.119.6.150",
+%%   Port = 27017,
+%%   Database = <<"db0">>,
+%%   Collection = <<"TopicHistory">>,
+%%   UserId = 10087,
+%%   Id = "USER/10089",
+%%   
+%%   {ok, Connection} = mongo:connect([{database, Database}, {host, Host}, {port, Port}]),
+%%   Count1 = mongo:count(Connection, Collection, {<<"_id">>, UserId}, 0),
+%%   Count1,
+%%   mongo:disconnect(Connection).
 	
-%% 获取用户Id
 id(Topic) ->
 	Index = string:chr(Topic, 47),
 	string:substr(Topic, Index + 1).
 
-%% 获取主题类型
 type(Topic) ->
 	Index = string:chr(Topic, 47),
 	case string:substr(Topic, 1, Index - 1) of
@@ -64,7 +69,6 @@ type(Topic) ->
 		_ -> 0
 	end.
 
-%% 获取当前时间秒数
 timestamp() -> 
   {M, S, _} = os:timestamp(),
   M * 1000000 + S.
